@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LLM Response Analyzer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>LLM Response Analyzer</h1>
+    <div class="file-loaders">
+      <label class="file-input">responses.json
+        <input type="file" id="responsesFile" accept="application/json" />
+      </label>
+      <label class="file-input">output.csv
+        <input type="file" id="csvFile" accept="text/csv,.csv" />
+      </label>
+      <button id="demoLoad" class="secondary">Try without files</button>
+    </div>
+  </header>
+
+  <section class="controls">
+    <div class="filter-group">
+      <label for="difficultyFilter">Difficulty</label>
+      <select id="difficultyFilter">
+        <option value="">All</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="typeFilter">Type</label>
+      <select id="typeFilter">
+        <option value="">All</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="searchInput">Search description</label>
+      <input type="text" id="searchInput" placeholder="Type to filter..." />
+    </div>
+    <div class="filter-group">
+      <label for="categoryFilter">Category</label>
+      <select id="categoryFilter">
+        <option value="">All</option>
+        <option value="__uncategorized__">Uncategorized</option>
+      </select>
+    </div>
+    <div class="filter-group right">
+      <button id="toggleSubmittedBtn" class="secondary">Show submitted</button>
+      <button id="exportData">Export annotations</button>
+      <label class="file-input small">Import
+        <input type="file" id="importData" accept="application/json" />
+      </label>
+    </div>
+  </section>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <h2>Categories</h2>
+      <ul id="categoryList" class="category-list"></ul>
+      <div class="category-actions">
+        <input type="text" id="newCategoryName" placeholder="New category" />
+        <button id="addCategory">Add</button>
+      </div>
+    </aside>
+    <section class="content">
+      <div id="stats" class="stats"></div>
+      <div id="responses" class="responses"></div>
+      <div class="pagination">
+        <button id="prevPage" class="secondary">Prev</button>
+        <span id="pageInfo"></span>
+        <button id="nextPage" class="secondary">Next</button>
+        <label class="page-size">Per page
+          <select id="pageSize">
+            <option>10</option>
+            <option selected>25</option>
+            <option>50</option>
+            <option>100</option>
+          </select>
+        </label>
+      </div>
+    </section>
+  </main>
+
+  <template id="responseItemTemplate">
+    <div class="response-item">
+      <div class="meta">
+        <div><strong>ID</strong>: <span data-field="responseId"></span></div>
+        <div><strong>Problem</strong>: <span data-field="problemId"></span> <span class="difficulty" data-field="difficulty"></span></div>
+        <div><strong>Type</strong>: <span data-field="type"></span></div>
+        <div><strong>Model</strong>: <span data-field="model"></span></div>
+      </div>
+      <details class="problem">
+        <summary>Problem details</summary>
+        <div class="problem-grid">
+          <div>
+            <div class="muted">Question</div>
+            <div data-field="problemQuestion"></div>
+          </div>
+          <div>
+            <div class="muted">Tags</div>
+            <div data-field="problemTags"></div>
+          </div>
+          <div>
+            <div class="muted">URL</div>
+            <div><a data-field="problemUrl" href="#" target="_blank" rel="noopener noreferrer"></a></div>
+          </div>
+          <div class="inline-fields">
+            <div>
+              <div class="muted">Time limit</div>
+              <div data-field="problemTimeLimit"></div>
+            </div>
+            <div>
+              <div class="muted">Memory limit</div>
+              <div data-field="problemMemoryLimit"></div>
+            </div>
+          </div>
+        </div>
+      </details>
+      <details class="trace">
+        <summary>Trace</summary>
+        <pre data-field="trace"></pre>
+      </details>
+      <div class="annotations">
+        <label>Description
+          <textarea data-field="description" rows="3" placeholder="Write a brief description..."></textarea>
+        </label>
+        <label>Category
+          <select data-field="category"></select>
+        </label>
+        <div class="actions">
+          <button data-action="submit" class="secondary">Submit analysis</button>
+          <span class="muted" data-field="submittedFlag"></span>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script src="app.js"></script>
+  
+</body>
+</html>
+
+

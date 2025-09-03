@@ -1,0 +1,57 @@
+[
+  {
+    "id": "r-0001",
+    "problem_id": 2,
+    "problem_name": "nth-fibonacci-number1335",
+    "type": "solution",
+    "model": "gpt-4o",
+    "trace": "Explained dynamic programming approach, O(n) time, O(1) space variant.",
+    "difficulty": "EASY"
+  },
+  {
+    "id": "r-0002",
+    "problem_id": 1,
+    "problem_name": "file-extension-check",
+    "type": "explanation",
+    "model": "gpt-4",
+    "trace": "Used regex for matching audio/image extensions; highlighted edge cases like dots and digits."
+  },
+  {
+    "id": "r-0003",
+    "problem_id": 3,
+    "problem_name": "two-sum",
+    "type": "solution",
+    "model": "claude-3.5-sonnet",
+    "trace": "Hash map approach with single pass; discussed time/space complexity.",
+    "difficulty": "EASY"
+  },
+  {
+    "id": "r-0004",
+    "problem_id": 4,
+    "problem_name": "longest-increasing-subsequence",
+    "type": "solution",
+    "model": "gpt-4o-mini",
+    "trace": "Patience sorting (binary search) technique; produced O(n log n) solution.",
+    "difficulty": "MEDIUM"
+  },
+  {
+    "id": "r-0005",
+    "problem_id": 5,
+    "problem_name": "lru-cache",
+    "type": "explanation",
+    "model": "gpt-4",
+    "trace": "Discussed doubly linked list + hash map design; touched on eviction policy.",
+    "difficulty": "MEDIUM"
+  },
+  {
+    "id": "r-0006",
+    "problem_id": 6,
+    "problem_name": "edit-distance",
+    "type": "solution",
+    "model": "gemini-1.5-pro",
+    "trace": "Classic DP with table; mentioned Levenshtein operations.",
+    "difficulty": "HARD"
+  }
+]
+
+
