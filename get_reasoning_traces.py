@@ -23,6 +23,7 @@ from dotenv import load_dotenv
 from typing import Dict, List, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+from openrouter_client import OpenRouterClient
 
 # Load environment variables from .env file
 load_dotenv()
@@ -32,10 +33,19 @@ csv.field_size_limit(50_000_000)  # Increase to 1MB per field
 
 # OpenRouter API configuration
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_URL = "https://openrouter.ai/api/v1"
 
 # Use a cost-effective reasoning model
-MODEL = "meta-llama/llama-3.1-8b-instruct:free"  # Free model with good reasoning capabilities
+# Try these models in order of preference (first available will be used)
+MODEL_OPTIONS = [
+    "meta-llama/llama-3.1-8b-instruct",  # Free model with good reasoning capabilities
+    "meta-llama/llama-3.1-70b-instruct",  # Larger, more capable model
+    "microsoft/phi-3-mini-128k-instruct",  # Alternative free model
+    "google/gemini-flash-1.5",  # Google's fast model
+    "openai/gpt-3.5-turbo"  # Reliable fallback
+]
+
+MODEL = MODEL_OPTIONS[0]  # Start with the first option
 
 # Thread-safe lock for file operations
 file_lock = threading.Lock()
@@ -44,6 +54,30 @@ file_lock = threading.Lock()
 MAX_WORKERS = 5  # Number of concurrent threads (adjust based on API limits)
 BATCH_SIZE = 20  # Problems per batch
 BATCH_DELAY = 2  # Seconds to wait between batches
+
+def find_available_model() -> str:
+    """Find the first available model from the options list"""
+    if not OPENROUTER_API_KEY:
+        return MODEL_OPTIONS[0]  # Return first option if no API key
+    
+    for model in MODEL_OPTIONS:
+        try:
+            # Test the model with a simple request using OpenRouterClient
+            openrouter_client = OpenRouterClient(OPENROUTER_API_KEY)
+            test_messages = [{"role": "user", "content": "Hello"}]
+            
+            response = openrouter_client.chat(model, test_messages, max_tokens=10)
+            
+            if response:
+                print(f"Using model: {model}")
+                return model
+                
+        except Exception as e:
+            print(f"Error testing model {model}: {str(e)}")
+            continue
+    
+    print("No models available, using first option as fallback")
+    return MODEL_OPTIONS[0]
 
 def get_llm_reasoning_trace(problem_data: Dict[str, Any]) -> str:
     """Generate reasoning trace for a programming problem using OpenRouter API"""
@@ -94,12 +128,16 @@ Keep your response concise but comprehensive, focusing on the reasoning process 
     }
     
     try:
-        response = requests.post(OPENROUTER_URL, headers=headers, json=data, timeout=30)
-        response.raise_for_status()
+        openrouter_client = OpenRouterClient(OPENROUTER_API_KEY)
+        response = openrouter_client.chat(MODEL, data['messages'])
+        return response
+        # response = requests.post(OPENROUTER_URL, headers=headers, json=data, timeout=30)
+        # response.raise_for_status()
+
         
-        result = response.json()
-        trace = result['choices'][0]['message']['content']
-        return trace.strip()
+        # result = response.json()
+        # trace = result['choices'][0]['message']['content']
+        # return trace.strip()
         
     except Exception as e:
         print(f"Error generating trace for problem {problem_id}: {str(e)}")
@@ -163,6 +201,9 @@ def process_problems():
                     # Progress indicator for large files
                     if (i + 1) % 1000 == 0:
                         print(f"Loaded {i + 1} problems...")
+
+                    if i > 5:
+                        break
                         
                 except Exception as e:
                     print(f"Error reading row {i + 1}: {str(e)}")
@@ -256,6 +297,9 @@ if __name__ == "__main__":
         print("Warning: OPENROUTER_API_KEY environment variable not set")
         print("Set it with: $env:OPENROUTER_API_KEY='your-api-key'")
         print("Continuing with placeholder traces...")
+    else:
+        # Find available model
+        MODEL = find_available_model()
     
     # Process problems
     responses = process_problems()
