@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Webapp</title>
+    <script src="app.js"></script>
+</head>
+<body>
+    <h1>Debug Webapp Data Loading</h1>
+    <div id="output"></div>
+    
+    <script>
+        async function debugDataLoading() {
+            const output = document.getElementById('output');
+            
+            try {
+                // Test loading responses
+                const response = await fetch('data/test_responses.jsonl');
+                if (response.ok) {
+                    const text = await response.text();
+                    const responses = text.trim().split('\n').map(line => JSON.parse(line));
+                    output.innerHTML += `<p>✅ Loaded ${responses.length} responses</p>`;
+                    
+                    // Test normalizeResponses function
+                    const normalized = normalizeResponses(responses);
+                    output.innerHTML += `<p>✅ Normalized ${normalized.length} responses</p>`;
+                    
+                    // Check first response
+                    if (normalized.length > 0) {
+                        const first = normalized[0];
+                        output.innerHTML += `<p>First response type: ${first.type}</p>`;
+                        output.innerHTML += `<p>Has confusion_matrix: ${'confusion_matrix' in first}</p>`;
+                        if (first.confusion_matrix) {
+                            output.innerHTML += `<p>Confusion matrix accuracy: ${first.confusion_matrix.accuracy}</p>`;
+                        } else {
+                            output.innerHTML += `<p>❌ No confusion_matrix in normalized response</p>`;
+                        }
+                    }
+                } else {
+                    output.innerHTML += `<p>❌ Failed to load responses: ${response.status}</p>`;
+                }
+                
+            } catch (error) {
+                output.innerHTML += `<p>❌ Error: ${error.message}</p>`;
+            }
+        }
+        
+        debugDataLoading();
+    </script>
+</body>
+</html>

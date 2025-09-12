@@ -58,6 +58,7 @@ def map_taco_problem(problem: dict, idx: int) -> Problem:
         statement = problem["question"],
         sample_inputs = in_out["inputs"],
         sample_outputs = in_out["outputs"],
+        difficulty = problem.get("difficulty") or "UNKNOWN_DIFFICULTY",
         solutions = eval(problem["solutions"]) if problem["solutions"] else [],
         time_limit = time_limit,
         memory_limit = memory_limit
@@ -125,10 +126,9 @@ def get_val_problems(config: Config, num_problems: int = 300) -> List[Problem]:
             if hasattr(problem, 'input_output') and problem.input_output == None:
                 continue
             
-            if problem.id in unique_difficulties:
-                continue
-            
-            unique_difficulties.add(problem.id)
+            # Only add valid difficulties to unique set
+            if hasattr(problem, 'difficulty') and problem.difficulty != 'UNKNOWN_DIFFICULTY':
+                unique_difficulties.add(problem.difficulty)
         
         # Calculate distribution across difficulties
         num_per_difficulty = num_problems // len(unique_difficulties) if unique_difficulties else num_problems
@@ -136,6 +136,14 @@ def get_val_problems(config: Config, num_problems: int = 300) -> List[Problem]:
             
         # Second pass: select problems based on difficulty distribution
         for problem in tqdm.tqdm(problems, desc="Filtering validation problems"):
+            # Stop if we have enough problems
+            if len(problems_filtered) >= num_problems:
+                break
+                
+            # Skip problems with UNKNOWN_DIFFICULTY
+            if hasattr(problem, 'difficulty') and problem.difficulty == 'UNKNOWN_DIFFICULTY':
+                continue
+                
             if hasattr(problem, 'difficulty') and problem.difficulty in difficulty_count:
                 if difficulty_count[problem.difficulty] >= num_per_difficulty:
                     continue
@@ -148,6 +156,7 @@ def get_val_problems(config: Config, num_problems: int = 300) -> List[Problem]:
             problems_filtered.append(problem)
             
         # Save to cache
+        print(f"Number of problems filtered: {len(problems_filtered)}")
         pickle.dump(problems_filtered, open(config.val_problems_path, "wb"))
         return problems_filtered
     
@@ -171,3 +180,8 @@ def get_val_problems(config: Config, num_problems: int = 300) -> List[Problem]:
         os.makedirs(os.path.dirname(config.val_problems_path), exist_ok=True)
         logging.info(f"File path {config.val_problems_path} created")
         return filter_problems()
+    
+if __name__ == "__main__":
+    config = Config()
+    problems = get_val_problems(config, num_problems=300)
+    print(f"Loaded {len(problems)} problems from TACO dataset")

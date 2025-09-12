@@ -88,12 +88,106 @@ button.danger { background: var(--danger); }
 .pagination { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 12px; }
 .page-size { color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
 
+/* Confusion Matrix Styles */
+.confusion-matrix {
+  padding: 0 12px 12px 12px;
+}
+
+.confusion-matrix-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  background: #0f1720;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.metric-label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metric-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.metric-value.good { color: var(--accent-2); }
+.metric-value.poor { color: var(--danger); }
+
+/* Inputs & Outputs Styles */
+.inputs-outputs {
+  padding: 0 12px 12px 12px;
+}
+
+.inputs-outputs-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.input-output-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.input-output-list {
+  display: grid;
+  gap: 8px;
+}
+
+.input-output-item {
+  background: #0f1720;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.input-output-item.correct {
+  border-color: var(--accent-2);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.input-output-item.incorrect {
+  border-color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+@media (min-width: 768px) {
+  .inputs-outputs-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 @media (max-width: 960px) {
   .layout { grid-template-columns: 1fr; }
   .sidebar { order: 2; }
   .content { order: 1; }
   .response-item .meta { grid-template-columns: 1fr 1fr; }
   .response-item .annotations { grid-template-columns: 1fr; }
+  .confusion-matrix-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 

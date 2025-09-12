@@ -10,8 +10,8 @@
   <header class="app-header">
     <h1>LLM Response Analyzer</h1>
     <div class="file-loaders">
-      <label class="file-input">responses.json
-        <input type="file" id="responsesFile" accept="application/json" />
+      <label class="file-input">responses.jsonl
+        <input type="file" id="responsesFile" accept=".jsonl,.json" />
       </label>
       <label class="file-input">validation_problems.json
         <input type="file" id="problemsFile" accept="application/json,.json" />
@@ -89,6 +89,43 @@
         <div><strong>Type</strong>: <span data-field="type"></span></div>
         <div><strong>Model</strong>: <span data-field="model"></span></div>
       </div>
+      <details class="confusion-matrix">
+        <summary>Performance Metrics</summary>
+        <div class="confusion-matrix-grid">
+          <div class="metric">
+            <div class="metric-label">Accuracy</div>
+            <div class="metric-value" data-field="accuracy">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Precision</div>
+            <div class="metric-value" data-field="precision">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Recall</div>
+            <div class="metric-value" data-field="recall">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">F1 Score</div>
+            <div class="metric-value" data-field="f1Score">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">TP</div>
+            <div class="metric-value" data-field="truePositives">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">FP</div>
+            <div class="metric-value" data-field="falsePositives">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">FN</div>
+            <div class="metric-value" data-field="falseNegatives">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">TN</div>
+            <div class="metric-value" data-field="trueNegatives">-</div>
+          </div>
+        </div>
+      </details>
       <details class="problem">
         <summary>Problem details</summary>
         <div class="problem-grid">
@@ -119,6 +156,23 @@
       <details class="trace">
         <summary>Trace</summary>
         <pre data-field="trace"></pre>
+      </details>
+      <details class="inputs-outputs">
+        <summary>Inputs & Outputs</summary>
+        <div class="inputs-outputs-grid">
+          <div class="input-output-section">
+            <h4>Test Inputs</h4>
+            <div data-field="testInputs" class="input-output-list"></div>
+          </div>
+          <div class="input-output-section">
+            <h4>Expected Outputs</h4>
+            <div data-field="expectedOutputs" class="input-output-list"></div>
+          </div>
+          <div class="input-output-section">
+            <h4>Generated Outputs</h4>
+            <div data-field="generatedOutputs" class="input-output-list"></div>
+          </div>
+        </div>
       </details>
       <div class="annotations">
         <label>Description

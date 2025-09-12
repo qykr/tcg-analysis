@@ -8,6 +8,9 @@ ANNOTATIONS_FILE = os.path.join(os.path.dirname(__file__), '..', 'data', 'annota
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=os.path.dirname(__file__), **kwargs)
+    
     def _send_json(self, payload, status=200):
         data = json.dumps(payload).encode('utf-8')
         self.send_response(status)
@@ -27,6 +30,26 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json(data)
             except Exception as e:
                 self._send_json({"error": str(e)}, status=500)
+        elif self.path.startswith('/data/'):
+            # Serve files from the data directory
+            data_file = os.path.join(os.path.dirname(__file__), '..', self.path[1:])
+            if os.path.exists(data_file):
+                try:
+                    with open(data_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    self.send_response(200)
+                    if data_file.endswith('.jsonl'):
+                        self.send_header('Content-Type', 'application/jsonl')
+                    elif data_file.endswith('.json'):
+                        self.send_header('Content-Type', 'application/json')
+                    else:
+                        self.send_header('Content-Type', 'text/plain')
+                    self.end_headers()
+                    self.wfile.write(content.encode('utf-8'))
+                except Exception as e:
+                    self.send_error(500, f'Error reading file: {str(e)}')
+            else:
+                self.send_error(404, 'File not found')
         else:
             super().do_GET()
 

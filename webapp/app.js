@@ -254,7 +254,7 @@ function normalizeResponses(list) {
         problemRow = state.problemsByName.get(problemName);
       }
     }
-    return {
+    const normalized = {
       id,
       problemId: r.problem_id || r.problemId || '',
       problemName: r.problem_name || r.problem || '',
@@ -262,6 +262,10 @@ function normalizeResponses(list) {
       model: r.model || '',
       trace: typeof r.trace === 'string' ? r.trace : JSON.stringify(r.trace, null, 2),
       difficulty,
+      confusion_matrix: r.confusion_matrix || null,
+      inputs: r.inputs || [],
+      expected_outputs: r.expected_outputs || [],
+      generated_outputs: r.generated_outputs || [],
       problem: problemRow ? {
         question: problemRow.question || '',
         tags: parseTagList(problemRow.tags || problemRow.raw_tags || ''),
@@ -270,6 +274,8 @@ function normalizeResponses(list) {
         memory_limit: problemRow.memory_limit || '',
       } : null,
     };
+    
+    return normalized;
   });
 }
 
@@ -328,6 +334,73 @@ function render() {
       tlEl.textContent = '';
       mlEl.textContent = '';
     }
+
+    // confusion matrix metrics
+    const cm = item.confusion_matrix || {};
+    const accuracyEl = node.querySelector('[data-field="accuracy"]');
+    const precisionEl = node.querySelector('[data-field="precision"]');
+    const recallEl = node.querySelector('[data-field="recall"]');
+    const f1ScoreEl = node.querySelector('[data-field="f1Score"]');
+    const tpEl = node.querySelector('[data-field="truePositives"]');
+    const fpEl = node.querySelector('[data-field="falsePositives"]');
+    const fnEl = node.querySelector('[data-field="falseNegatives"]');
+    const tnEl = node.querySelector('[data-field="trueNegatives"]');
+    
+    function formatMetric(value, decimals = 3) {
+      if (value === undefined || value === null) return '-';
+      return typeof value === 'number' ? value.toFixed(decimals) : value;
+    }
+    
+    function addMetricClass(el, value) {
+      if (typeof value === 'number') {
+        el.classList.remove('good', 'poor');
+        if (value >= 0.8) el.classList.add('good');
+        else if (value < 0.5) el.classList.add('poor');
+      }
+    }
+    
+    accuracyEl.textContent = formatMetric(cm.accuracy);
+    precisionEl.textContent = formatMetric(cm.precision);
+    recallEl.textContent = formatMetric(cm.recall);
+    f1ScoreEl.textContent = formatMetric(cm.f1_score);
+    tpEl.textContent = formatMetric(cm.true_positives, 0);
+    fpEl.textContent = formatMetric(cm.false_positives, 0);
+    fnEl.textContent = formatMetric(cm.false_negatives, 0);
+    tnEl.textContent = formatMetric(cm.true_negatives, 0);
+    
+    addMetricClass(accuracyEl, cm.accuracy);
+    addMetricClass(precisionEl, cm.precision);
+    addMetricClass(recallEl, cm.recall);
+    addMetricClass(f1ScoreEl, cm.f1_score);
+
+    // inputs and outputs
+    const testInputsEl = node.querySelector('[data-field="testInputs"]');
+    const expectedOutputsEl = node.querySelector('[data-field="expectedOutputs"]');
+    const generatedOutputsEl = node.querySelector('[data-field="generatedOutputs"]');
+    
+    function renderInputOutputList(container, items, compareItems = null) {
+      container.innerHTML = '';
+      items.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'input-output-item';
+        div.textContent = item;
+        
+        // Add comparison styling if compareItems provided
+        if (compareItems && compareItems[index]) {
+          if (item === compareItems[index]) {
+            div.classList.add('correct');
+          } else {
+            div.classList.add('incorrect');
+          }
+        }
+        
+        container.appendChild(div);
+      });
+    }
+    
+    renderInputOutputList(testInputsEl, item.inputs || []);
+    renderInputOutputList(expectedOutputsEl, item.expected_outputs || []);
+    renderInputOutputList(generatedOutputsEl, item.generated_outputs || [], item.expected_outputs || []);
 
     // annotations
     const ann = state.annotations[item.id] || { description: '', categoryId: '' };
@@ -454,13 +527,22 @@ el.responsesFile.addEventListener('change', async (e) => {
   if (!file) return;
   try {
     const text = await readTextFile(file);
-    const json = JSON.parse(text);
-    state.responses = normalizeResponses(json);
+    
+    // Try to parse as JSONL first
+    if (file.name.endsWith('.jsonl')) {
+      const responses = text.trim().split('\n').map(line => JSON.parse(line));
+      state.responses = normalizeResponses(responses);
+    } else {
+      // Fallback to JSON format
+      const json = JSON.parse(text);
+      state.responses = normalizeResponses(json);
+    }
+    
     hydrateFilters();
     state.pagination.page = 1;
     render();
   } catch (err) {
-    alert('Failed to read responses.json: ' + err.message);
+    alert('Failed to read responses file: ' + err.message);
   }
 });
 
@@ -605,21 +687,35 @@ render();
   let problemsLoaded = false;
   let jsonLoaded = false;
   try {
-    // Prefer validation_problems_with_ids.json if it exists; else fallback to validation_problems.json
-    let rows;
-    try {
-      rows = await loadProblemsJsonUrl('../data/validation_problems_with_ids.json');
-    } catch (_) {
-      rows = await loadProblemsJsonUrl('../data/validation_problems.json');
+    // Load problems first
+    const problemsResponse = await fetch('../data/validation_problems.json', { cache: 'no-store' });
+    if (problemsResponse.ok) {
+      const problems = await problemsResponse.json();
+      indexProblems(problems);
+      problemsLoaded = true;
     }
-    indexProblems(rows);
-    problemsLoaded = true;
   } catch (_) { /* ignore */ }
 
   try {
-    const json = await loadJsonUrl('../data/responses.json');
-    state.responses = normalizeResponses(json);
-    jsonLoaded = true;
+    // Try to load responses from JSONL format
+    const response = await fetch('../data/test_responses.jsonl', { cache: 'no-store' });
+    if (response.ok) {
+      const text = await response.text();
+      const responses = text.trim().split('\n').map(line => JSON.parse(line));
+      state.responses = normalizeResponses(responses);
+      jsonLoaded = true;
+    }
+  } catch (_) { /* ignore */ }
+
+  try {
+    // Try to load responses from responses.jsonl as fallback
+    const response = await fetch('../data/responses.jsonl', { cache: 'no-store' });
+    if (response.ok) {
+      const text = await response.text();
+      const responses = text.trim().split('\n').map(line => JSON.parse(line));
+      state.responses = normalizeResponses(responses);
+      jsonLoaded = true;
+    }
   } catch (_) { /* ignore */ }
 
   if (problemsLoaded || jsonLoaded) {
@@ -629,6 +725,10 @@ render();
     state.pagination.page = 1;
     // initialize toggle button label
     refreshSubmittedBtnLabel();
+    console.log('Data loaded - responses:', state.responses.length);
+    if (state.responses.length > 0) {
+      console.log('First response confusion_matrix:', state.responses[0].confusion_matrix);
+    }
     render();
   }
 })();

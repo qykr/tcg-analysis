@@ -4,8 +4,8 @@ from enum import Enum
 
 @dataclass
 class Config:
-    mapped_taco_path: str = '../data/mapped_taco.pkl'
-    val_problems_path: str = '../data/val_problems.pkl'
+    mapped_taco_path: str = 'data/mapped_taco.pkl'
+    val_problems_path: str = 'data/val_problems.pkl'
     processes: int = 8
 
 @dataclass
@@ -16,6 +16,7 @@ class Problem:
     statement: str
     sample_inputs: List[str]
     sample_outputs: List[str]
+    difficulty: str
     solutions: List[str]
     time_limit: float = 2.0  # seconds
     memory_limit: int = 256  # MB
@@ -29,7 +30,7 @@ class Problem:
         description += f"Statement:\n{self.statement}\n\n"
         description += f"Time Limit: {self.time_limit} seconds\n"
         description += f"Memory Limit: {self.memory_limit} MB\n"
-        
+        description += f"Difficulty: {self.difficulty}\n"
         return description
 
 @dataclass

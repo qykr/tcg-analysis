@@ -21,6 +21,7 @@ from prompts import (
     generate_test_inputs,
     SandboxExecutor
 )
+from generation.confusion_matrix_utils import calculate_confusion_matrix_stats
 
 # Load environment variables
 load_dotenv()
@@ -157,6 +158,9 @@ class ReasoningTraceGenerator:
                 # Store the reasoning text directly as the trace
                 structured_trace = reasoning_text
                 
+                # Calculate confusion matrix statistics
+                confusion_matrix = calculate_confusion_matrix_stats(expected_outputs, generated_outputs)
+                
                 # Create response object
                 response = {
                     "id": f"r-{time.time()}",
@@ -165,7 +169,8 @@ class ReasoningTraceGenerator:
                     "trace": structured_trace,
                     "inputs": test_inputs,
                     "expected_outputs": expected_outputs,
-                    "generated_outputs": generated_outputs
+                    "generated_outputs": generated_outputs,
+                    "confusion_matrix": confusion_matrix
                 }
                 
             else:  # naive coder
@@ -198,6 +203,9 @@ class ReasoningTraceGenerator:
                     execution_results = [{"input": inp, "output": "NO_CODE_EXTRACTED", "success": False} for inp in test_inputs]
                     generated_outputs = ["NO_CODE_EXTRACTED"] * len(test_inputs)
                 
+                # Calculate confusion matrix statistics
+                confusion_matrix = calculate_confusion_matrix_stats([str(output) for output in test_outputs], generated_outputs)
+                
                 # Create response object
                 response = {
                     "id": f"r-{time.time()}",
@@ -206,7 +214,8 @@ class ReasoningTraceGenerator:
                     "trace": trace,
                     "inputs": test_inputs,
                     "expected_outputs": [str(output) for output in test_outputs],  # Use actual expected outputs
-                    "generated_outputs": generated_outputs
+                    "generated_outputs": generated_outputs,
+                    "confusion_matrix": confusion_matrix
                 }
             
             # Save immediately to JSONL
