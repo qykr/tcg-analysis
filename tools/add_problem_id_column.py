@@ -1,41 +1,28 @@
-import csv
+import json
 import sys
 from pathlib import Path
 
 
 def main():
     project_root = Path(__file__).resolve().parents[1]
-    src = project_root / 'output.csv'
-    dst = project_root / 'output_with_ids.csv'
+    src = project_root / 'data' / 'validation_problems.json'
+    dst = project_root / 'data' / 'validation_problems_with_ids.json'
 
     if not src.exists():
-        print(f'Source CSV not found: {src}', file=sys.stderr)
+        print(f'Source JSON not found: {src}', file=sys.stderr)
         sys.exit(1)
 
-    # Allow very large CSV fields
-    try:
-        csv.field_size_limit(sys.maxsize)
-    except OverflowError:
-        csv.field_size_limit(10 ** 9)
+    # Load the JSON data
+    with src.open('r', encoding='utf-8') as f:
+        data = json.load(f)
 
-    with src.open('r', newline='', encoding='utf-8') as f_in, dst.open('w', newline='', encoding='utf-8') as f_out:
-        reader = csv.reader(f_in)
-        writer = csv.writer(f_out)
-
-        try:
-            header = next(reader)
-        except StopIteration:
-            print('Source CSV is empty', file=sys.stderr)
-            sys.exit(1)
-
-        # Prepend problem_id header
-        writer.writerow(['problem_id'] + header)
-
-        # Write rows with 1-based problem_id index
-        for idx, row in enumerate(reader, start=1):
-            writer.writerow([idx] + row)
+    # The JSON structure already has problem indices as keys, so we just copy it
+    # This tool is mainly for compatibility - the JSON format already has proper indices
+    with dst.open('w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
     print(f'Wrote {dst}')
+    print('Note: validation_problems.json already has proper problem indices as keys')
 
 
 if __name__ == '__main__':

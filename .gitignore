@@ -1,1 +1,4 @@
 .env
+*.pkl
+__pycache__/
+.DS_STORE

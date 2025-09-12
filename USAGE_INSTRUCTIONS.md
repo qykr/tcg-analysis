@@ -1,6 +1,6 @@
 # LLM Reasoning Traces Generator
 
-This script reads programming problems from `output.csv` and generates LLM reasoning traces using OpenRouter's API, then outputs them to `responses.json` in the specified format.
+This script reads programming problems from `validation_problems.json` and generates LLM reasoning traces using OpenRouter's API, then outputs them to `responses.json` in the specified format.
 
 ## Setup
 
@@ -70,7 +70,7 @@ BATCH_DELAY = 2      # Seconds to wait between batches
 
 ## Notes
 
-- The script will process all problems in `output.csv`
+- The script will process all problems in `validation_problems.json`
 - If `responses.json` already exists, it will append new entries
 - Duplicate problem IDs are automatically skipped
 - Each reasoning trace includes step-by-step problem analysis and solution strategy

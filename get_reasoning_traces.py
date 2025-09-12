@@ -1,263 +1,303 @@
-# gets llm reasoning traces
-# dump to responses.json
+#!/usr/bin/env python3
+"""
+Generate LLM reasoning traces for competitive programming problems.
+Reads from validation_problems.json, generates naive coder and reasoner responses using OpenRouterClient,
+and saves to responses.jsonl format.
+"""
 
-# in this format
-# {
-#   "id": "r-0001",
-#   "problem_id": 2,
-#   "problem_name": "nth-fibonacci-number1335",
-#   "type": "solution",
-#   "model": "gpt-4o",
-#   "trace": "Explained dynamic programming approach...",
-#   "difficulty": "EASY"
-# }
-
-# load from csv output.csv
-
-import csv
+import asyncio
 import json
-import requests
 import time
 import os
-from dotenv import load_dotenv
 from typing import Dict, List, Any
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import threading
+from tqdm import tqdm
+from dotenv import load_dotenv
+from lm_client import OpenRouterClient
+from prompts import (
+    get_naive_coder_prompt, 
+    get_reasoner_prompt, 
+    get_reasoner_schema,
+    extract_python_code,
+    generate_test_inputs,
+    SandboxExecutor
+)
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
-# Increase CSV field size limit to handle large text fields
-csv.field_size_limit(50_000_000)  # Increase to 1MB per field
-
-# OpenRouter API configuration
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-
-# Use a cost-effective reasoning model
-MODEL = "meta-llama/llama-3.1-8b-instruct:free"  # Free model with good reasoning capabilities
-
-# Thread-safe lock for file operations
-file_lock = threading.Lock()
-
-# Parallelization configuration
-MAX_WORKERS = 5  # Number of concurrent threads (adjust based on API limits)
-BATCH_SIZE = 20  # Problems per batch
-BATCH_DELAY = 2  # Seconds to wait between batches
-
-def get_llm_reasoning_trace(problem_data: Dict[str, Any]) -> str:
-    """Generate reasoning trace for a programming problem using OpenRouter API"""
+class ReasoningTraceGenerator:
+    def __init__(self, api_key: str, model: str = "openai/gpt-4o-mini", output_file: str = "responses.jsonl", sandbox_url: str = "http://localhost:8080"):
+        self.client = OpenRouterClient(api_key)
+        self.model = model
+        self.output_file = output_file
+        self.results = []
+        self.sandbox = SandboxExecutor(sandbox_url)
     
-    if not OPENROUTER_API_KEY:
-        return "API key not provided - using placeholder trace"
-    
-    # Extract relevant problem information
-    problem_id = problem_data.get('problem_id', 'Unknown')
-    question = problem_data.get('question', 'No question provided')
-    difficulty = problem_data.get('difficulty', 'Unknown')
-    name = problem_data.get('name', 'Unknown problem')
-    
-    # Create a prompt for the LLM to generate reasoning traces
-    prompt = f"""You are an expert programming tutor. Analyze this programming problem and provide a detailed reasoning trace showing your thought process for solving it.
-
-Problem ID: {problem_id}
-Problem Name: {name}
-Difficulty: {difficulty}
-
-Problem Description:
-{question}
-
-Please provide a step-by-step reasoning trace that includes:
-1. Understanding the problem requirements
-2. Identifying the key challenges
-3. Considering different approaches
-4. Explaining the optimal solution strategy
-5. Discussing time and space complexity considerations
-
-Keep your response concise but comprehensive, focusing on the reasoning process rather than just the final solution."""
-
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    data = {
-        "model": MODEL,
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        "max_tokens": 1000,
-        "temperature": 0.7
-    }
-    
-    try:
-        response = requests.post(OPENROUTER_URL, headers=headers, json=data, timeout=30)
-        response.raise_for_status()
-        
-        result = response.json()
-        trace = result['choices'][0]['message']['content']
-        return trace.strip()
-        
-    except Exception as e:
-        print(f"Error generating trace for problem {problem_id}: {str(e)}")
-        return f"Error generating trace: {str(e)}"
-
-def process_single_problem(problem_data: Dict[str, Any], problem_index: int, total_problems: int) -> Dict[str, Any]:
-    """Process a single problem and return the response entry"""
-    problem_id = problem_data.get('problem_id')
-    
-    print(f"Processing problem {problem_index + 1}/{total_problems}: ID {problem_id}")
-    
-    # Generate reasoning trace
-    trace = get_llm_reasoning_trace(problem_data)
-    
-    # Create response entry
-    response_entry = {
-        "id": f"r-{problem_index + 1:04d}",  # Will be updated later with actual count
-        "problem_id": int(problem_id) if problem_id else 0,
-        "problem_name": problem_data.get('name', 'unknown'),
-        "type": "solution",
-        "model": MODEL,
-        "trace": trace,
-        "difficulty": problem_data.get('difficulty', 'Unknown')
-    }
-    
-    return response_entry
-
-def save_responses_threadsafe(responses: List[Dict[str, Any]]):
-    """Thread-safe function to save responses to file"""
-    with file_lock:
-        with open('responses.json', 'w') as f:
-            json.dump(responses, f, indent=2)
-
-def process_problems():
-    """Process all problems from CSV and generate reasoning traces"""
-    
-    # Load existing responses if any
-    existing_responses = []
-    if os.path.exists('responses.json'):
+    def parse_input_output(self, input_output_str: str) -> str:
+        """Parse input_output field to extract input format description."""
         try:
-            with open('responses.json', 'r') as f:
-                existing_responses = json.load(f)
-        except:
-            existing_responses = []
+            data = json.loads(input_output_str)
+            if isinstance(data, dict) and 'inputs' in data:
+                # Format inputs for display
+                inputs = data['inputs']
+                if isinstance(inputs, list) and len(inputs) > 0:
+                    return f"Input examples: {inputs[:3]}"  # Show first 3 examples
+        except (json.JSONDecodeError, KeyError, TypeError):
+            pass
+        return "Standard input format"
     
-    # Get existing problem IDs to avoid duplicates
-    existing_problem_ids = {resp.get('problem_id') for resp in existing_responses}
+    def create_messages(self, prompt: str) -> List[Dict[str, str]]:
+        """Create messages for the LLM API."""
+        return [
+            {"role": "system", "content": "You are a helpful assistant that solves competitive programming problems."},
+            {"role": "user", "content": prompt}
+        ]
     
-    # Read CSV data with better error handling
-    data = []
-    try:
-        with open('output.csv', mode='r', encoding='utf-8', errors='ignore') as infile:
-            reader = csv.DictReader(infile)
-            for i, row in enumerate(reader):
+    def save_response(self, response: Dict[str, Any]):
+        """Save a single response to JSONL file immediately."""
+        with open(self.output_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(response) + '\n')
+        self.results.append(response)
+    
+    async def generate_response(self, problem_data: Dict[str, Any], persona_type: str) -> Dict[str, Any]:
+        """Generate a single response for a problem."""
+        problem_id = problem_data['problem_id']
+        problem_name = problem_data.get('name', f'problem-{problem_id}')
+        question = problem_data.get('question', '')
+        input_output = problem_data.get('input_output', '')
+        
+        # Generate test inputs and outputs for both personas
+        test_inputs, test_outputs = generate_test_inputs(problem_data, num_inputs=3)
+        
+        # Parse input format
+        input_format = self.parse_input_output(input_output)
+        
+        try:
+            if persona_type == "reasoning":
+                # Generate prompt with test inputs
+                prompt = get_reasoner_prompt(question, test_inputs)
+                messages = self.create_messages(prompt)
+                
+                # Get the full response
+                full_response = await self.client.async_chat(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=4000,
+                    temperature=0.7
+                )
+                
+                # Extract JSON from the end of the response
                 try:
-                    # Truncate very long fields to prevent memory issues
-                    if 'question' in row and len(row['question']) > 10000:
-                        row['question'] = row['question'][:10000] + "... [truncated]"
-                    data.append(row)
+                    # Look for JSON in code blocks first
+                    import re
+                    json_pattern = r'```json\s*(\{.*?\})\s*```'
+                    json_match = re.search(json_pattern, full_response, re.DOTALL)
                     
-                    # Progress indicator for large files
-                    if (i + 1) % 1000 == 0:
-                        print(f"Loaded {i + 1} problems...")
+                    if json_match:
+                        json_part = json_match.group(1)
+                        reasoning_text = full_response[:json_match.start()].strip()
+                        parsed_output = json.loads(json_part)
+                    else:
+                        # Look for JSON at the end
+                        json_start = full_response.rfind('{')
+                        if json_start != -1:
+                            json_part = full_response[json_start:]
+                            reasoning_text = full_response[:json_start].strip()
+                            parsed_output = json.loads(json_part)
+                        else:
+                            # No JSON found, try to extract from text
+                            reasoning_text = full_response
+                            
+                            # Try to extract outputs from text patterns
+                            import re
+                            # Look for patterns like "Expected outputs: ['4', '-1', '-1']"
+                            outputs_pattern = r'Expected outputs:\s*\[(.*?)\]'
+                            outputs_match = re.search(outputs_pattern, full_response)
+                            
+                            if outputs_match:
+                                try:
+                                    outputs_str = outputs_match.group(1)
+                                    # Parse the outputs string
+                                    outputs = []
+                                    for item in outputs_str.split(','):
+                                        item = item.strip().strip("'\"")
+                                        outputs.append(item)
+                                    # Only take the first N outputs where N is the number of test inputs
+                                    expected_outputs = outputs[:len(test_inputs)]
+                                    generated_outputs = outputs[:len(test_inputs)]
+                                except:
+                                    expected_outputs = [str(output) for output in test_outputs]
+                                    generated_outputs = ["N/A"] * len(test_inputs)
+                            else:
+                                expected_outputs = [str(output) for output in test_outputs]
+                                generated_outputs = ["N/A"] * len(test_inputs)
+                            parsed_output = None
+                    
+                    if parsed_output:
+                        # Extract outputs
+                        expected_outputs = []
+                        generated_outputs = []
                         
-                except Exception as e:
-                    print(f"Error reading row {i + 1}: {str(e)}")
-                    continue
-    except Exception as e:
-        print(f"Error reading CSV file: {str(e)}")
-        return []
-    
-    print(f"Successfully loaded {len(data)} problems from CSV")
-    
-    # Filter out already processed problems
-    new_problems = []
-    for i, problem_data in enumerate(data):
-        problem_id = problem_data.get('problem_id')
-        if problem_id not in existing_problem_ids:
-            new_problems.append((problem_data, i))
-        else:
-            print(f"Skipping problem {problem_id} - already processed")
-    
-    print(f"Found {len(new_problems)} new problems to process")
-    
-    if not new_problems:
-        print("No new problems to process!")
-        return existing_responses
-    
-    # Process problems in parallel
-    responses = existing_responses.copy()
-    
-    # Process in batches to avoid overwhelming the API
-    total_batches = (len(new_problems) + BATCH_SIZE - 1) // BATCH_SIZE
-    
-    for batch_num in range(total_batches):
-        start_idx = batch_num * BATCH_SIZE
-        end_idx = min(start_idx + BATCH_SIZE, len(new_problems))
-        batch_problems = new_problems[start_idx:end_idx]
-        
-        print(f"Processing batch {batch_num + 1}/{total_batches} ({len(batch_problems)} problems)")
-        
-        # Use ThreadPoolExecutor for parallel processing
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            # Submit all tasks in the batch
-            future_to_problem = {
-                executor.submit(
-                    process_single_problem, 
-                    problem_data, 
-                    start_idx + i, 
-                    len(data)
-                ): (problem_data, start_idx + i) 
-                for i, (problem_data, _) in enumerate(batch_problems)
-            }
+                        if "outputs" in parsed_output:
+                            outputs = parsed_output["outputs"]
+                            for output in outputs:
+                                expected_outputs.append(str(output))
+                                generated_outputs.append(str(output))
+                        else:
+                            # Fallback: use actual expected outputs from the problem data
+                            expected_outputs = [str(output) for output in test_outputs]
+                            generated_outputs = ["N/A"] * len(test_inputs)
+                        
+                except json.JSONDecodeError:
+                    # Fallback to plain text if JSON parsing fails
+                    reasoning_text = full_response
+                    expected_outputs = [str(output) for output in test_outputs]
+                    generated_outputs = ["N/A"] * len(test_inputs)
+                
+                # Store the reasoning text directly as the trace
+                structured_trace = reasoning_text
+                
+                # Create response object
+                response = {
+                    "id": f"r-{time.time()}",
+                    "problem_id": int(problem_id),
+                    "type": persona_type,
+                    "trace": structured_trace,
+                    "inputs": test_inputs,
+                    "expected_outputs": expected_outputs,
+                    "generated_outputs": generated_outputs
+                }
+                
+            else:  # naive coder
+                # Generate prompt with input format
+                prompt = get_naive_coder_prompt(question, input_format)
+                messages = self.create_messages(prompt)
+                
+                # Generate code
+                trace = await self.client.async_chat(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=2000,
+                    temperature=0.7
+                )
+                
+                # Extract Python code from the response
+                extracted_code = extract_python_code(trace)
+                
+                # Execute code with multiple test inputs
+                execution_results = []
+                generated_outputs = []
+                if extracted_code:
+                    try:
+                        execution_results = self.sandbox.execute_code_multiple_inputs(extracted_code, test_inputs)
+                        generated_outputs = [result["output"] for result in execution_results]
+                    except Exception as e:
+                        execution_results = [{"input": inp, "output": f"ERROR: {str(e)}", "success": False} for inp in test_inputs]
+                        generated_outputs = [f"ERROR: {str(e)}"] * len(test_inputs)
+                else:
+                    execution_results = [{"input": inp, "output": "NO_CODE_EXTRACTED", "success": False} for inp in test_inputs]
+                    generated_outputs = ["NO_CODE_EXTRACTED"] * len(test_inputs)
+                
+                # Create response object
+                response = {
+                    "id": f"r-{time.time()}",
+                    "problem_id": int(problem_id),
+                    "type": persona_type,
+                    "trace": trace,
+                    "inputs": test_inputs,
+                    "expected_outputs": [str(output) for output in test_outputs],  # Use actual expected outputs
+                    "generated_outputs": generated_outputs
+                }
             
-            # Collect results as they complete
-            batch_responses = []
-            for future in as_completed(future_to_problem):
-                try:
-                    response_entry = future.result()
-                    batch_responses.append(response_entry)
-                    print(f"Completed problem {response_entry['problem_id']}")
-                except Exception as e:
-                    problem_data, problem_index = future_to_problem[future]
-                    print(f"Error processing problem {problem_data.get('problem_id')}: {str(e)}")
-                    # Create error entry
-                    error_entry = {
-                        "id": f"r-{len(responses) + len(batch_responses) + 1:04d}",
-                        "problem_id": int(problem_data.get('problem_id', 0)) if problem_data.get('problem_id') else 0,
-                        "problem_name": problem_data.get('name', 'unknown'),
-                        "type": "solution",
-                        "model": MODEL,
-                        "trace": f"Error processing: {str(e)}",
-                        "difficulty": problem_data.get('difficulty', 'Unknown')
-                    }
-                    batch_responses.append(error_entry)
-        
-        # Add batch results to main responses
-        responses.extend(batch_responses)
-        
-        # Save progress after each batch
-        save_responses_threadsafe(responses)
-        print(f"Completed batch {batch_num + 1}. Total responses: {len(responses)}")
-        
-        # Small delay between batches to be respectful to the API
-        if batch_num < total_batches - 1:
-            time.sleep(BATCH_DELAY)
+            # Save immediately to JSONL
+            self.save_response(response)
+            return response
+            
+        except Exception as e:
+            print(f"Error generating response for problem {problem_id} ({persona_type}): {e}")
+            return None
     
-    print(f"Completed! Generated {len(responses)} total responses")
-    return responses
+    async def process_problems(self, json_file: str, max_problems: int = 300):
+        """Process problems from JSON and generate responses."""
+        print(f"Reading problems from {json_file}...")
+        
+        with open(json_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # Convert JSON structure to list of problems
+        problems = []
+        question_data = data.get('question', {})
+        difficulty_data = data.get('difficulty', {})
+        input_output_data = data.get('input_output', {})
+        
+        # Get all problem indices
+        problem_indices = list(question_data.keys())
+        
+        for idx in problem_indices:
+            problem = {
+                'problem_id': idx,
+                'question': question_data.get(idx, ''),
+                'difficulty': difficulty_data.get(idx, ''),
+                'input_output': input_output_data.get(idx, '')
+            }
+            problems.append(problem)
+        
+        # Limit to max_problems
+        problems = problems[:max_problems]
+        print(f"Processing {len(problems)} problems...")
+        
+        # Clear output file
+        with open(self.output_file, 'w', encoding='utf-8') as f:
+            pass  # Create empty file
+        
+        # Create tasks for all responses (2 per problem)
+        tasks = []
+        for problem in problems:
+            # Add naive coder task
+            tasks.append(self.generate_response(problem, "naive"))
+            # Add reasoner task  
+            tasks.append(self.generate_response(problem, "reasoning"))
+        
+        # Process with progress bar
+        print(f"Generating {len(tasks)} responses...")
+        results = []
+        
+        # Use asyncio.as_completed with tqdm
+        with tqdm(total=len(tasks), desc="Generating responses") as pbar:
+            for coro in asyncio.as_completed(tasks):
+                result = await coro
+                if result:
+                    results.append(result)
+                pbar.update(1)
+                # Small delay to avoid rate limiting
+                await asyncio.sleep(0.1)
+        
+        print(f"Generated {len(results)} responses, saved to {self.output_file}")
+    
+    def save_results(self, output_file: str = "responses.jsonl"):
+        """Save results to JSONL format (already saved line by line)."""
+        print(f"Responses already saved to {self.output_file} during generation")
+        print(f"Total responses: {len(self.results)}")
 
-if __name__ == "__main__":
-    # Check for API key
-    if not OPENROUTER_API_KEY:
-        print("Warning: OPENROUTER_API_KEY environment variable not set")
-        print("Set it with: $env:OPENROUTER_API_KEY='your-api-key'")
-        print("Continuing with placeholder traces...")
+async def main():
+    """Main function to run the trace generation."""
+    # Get API key from environment
+    api_key = os.getenv('OPENROUTER_API_KEY')
+    if not api_key:
+        print("Error: OPENROUTER_API_KEY environment variable not set")
+        print("Please set it with: export OPENROUTER_API_KEY='your-key-here'")
+        return
+    
+    # Initialize generator
+    generator = ReasoningTraceGenerator(api_key)
     
     # Process problems
-    responses = process_problems()
-    print(f"Generated {len(responses)} reasoning traces")
+    await generator.process_problems('data/validation_problems.json', max_problems=300)
+    
+    # Results already saved line by line
+    generator.save_results()
+    
+    print("Done! Generated responses saved to responses.jsonl")
 
+if __name__ == "__main__":
+    asyncio.run(main())

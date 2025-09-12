@@ -1,0 +1,2 @@
+{"id": "r-0001", "problem_id": 2, "problem_name": "nth-fibonacci-number1335", "type": "solution", "model": "gpt-4o", "trace": "Explained dynamic programming approach, O(n) time, O(1) space variant.", "difficulty": "EASY"}
+{"id": "r-0002", "problem_id": 1, "problem_name": "file-extension-check", "type": "explanation", "model": "gpt-4", "trace": "Used regex for matching audio/image extensions; highlighted edge cases like dots and digits."}
