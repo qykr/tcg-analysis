@@ -158,6 +158,10 @@ def get_val_problems(config: Config, num_problems: int = 300) -> List[Problem]:
         # Save to cache
         print(f"Number of problems filtered: {len(problems_filtered)}")
         pickle.dump(problems_filtered, open(config.val_problems_path, "wb"))
+        
+        # Automatically convert to JSON for webapp
+        convert_problems_to_json(problems_filtered)
+        
         return problems_filtered
     
     # Try to load from cache first, fall back to processing if cache is corrupted
@@ -180,8 +184,46 @@ def get_val_problems(config: Config, num_problems: int = 300) -> List[Problem]:
         os.makedirs(os.path.dirname(config.val_problems_path), exist_ok=True)
         logging.info(f"File path {config.val_problems_path} created")
         return filter_problems()
+
+def convert_problems_to_json(problems: List[Problem], json_path: str = None) -> str:
+    """
+    Convert Problem dataclass objects to JSON format for webapp.
+    Returns the path to the created JSON file.
+    """
+    if json_path is None:
+        json_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'validation_problems.json')
+    
+    # Convert to webapp format
+    webapp_problems = []
+    for i, problem in enumerate(problems):
+        if isinstance(problem, Problem):
+            webapp_problem = {
+                'problem_id': str(problem.id),
+                'name': problem.name,
+                'question': problem.statement,
+                'difficulty': problem.difficulty,
+                'tags': [],  # We don't have tags in Problem dataclass
+                'url': '',  # We don't have URL in Problem dataclass
+                'time_limit': str(problem.time_limit),
+                'memory_limit': str(problem.memory_limit),
+                'sample_inputs': problem.sample_inputs,
+                'sample_outputs': problem.sample_outputs,
+            }
+            webapp_problems.append(webapp_problem)
+        else:
+            print(f"Warning: Problem {i} is not a Problem dataclass: {type(problem)}")
+    
+    # Save as JSON
+    with open(json_path, 'w') as f:
+        json.dump(webapp_problems, f, indent=2)
+    
+    print(f"Converted {len(webapp_problems)} problems to {json_path}")
+    return json_path
     
 if __name__ == "__main__":
     config = Config()
     problems = get_val_problems(config, num_problems=300)
     print(f"Loaded {len(problems)} problems from TACO dataset")
+    
+    # Automatically convert to JSON for webapp
+    convert_problems_to_json(problems)

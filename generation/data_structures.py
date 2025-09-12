@@ -1,12 +1,17 @@
 from dataclasses import dataclass, field
 from typing import List, Optional
 from enum import Enum
+import os
 
 @dataclass
 class Config:
-    mapped_taco_path: str = 'data/mapped_taco.pkl'
-    val_problems_path: str = 'data/val_problems.pkl'
+    mapped_taco_path: str = '../data/mapped_taco.pkl'
+    val_problems_path: str = '../data/val_problems.pkl'
     processes: int = 8
+    
+    def __post_init__(self):
+        self.mapped_taco_path = os.path.join(os.path.dirname(__file__), self.mapped_taco_path)
+        self.val_problems_path = os.path.join(os.path.dirname(__file__), self.val_problems_path)
 
 @dataclass
 class Problem:
