@@ -74,7 +74,7 @@ def get_mapped_taco(config: Config, split="train", remove_interactive=True) -> L
         logging.info(f"No cached TACO mapping found. Creating a new one at {config.mapped_taco_path}")
         dataset_mapped = []
         taco_ids_to_index = {}
-        dataset = load_dataset("BAAI/TACO", split=split)
+        dataset = load_dataset("BAAI/TACO", split=split, trust_remote_code=True)
         # keywords to identify interactive problems that should be filtered out
         keywords = [
             "interact with", "query the judge", "ask the judge", "exchange of data",

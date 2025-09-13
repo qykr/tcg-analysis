@@ -5,9 +5,15 @@ import json
 import io
 import sys
 import multiprocessing
-import resource
 import ast
 import asyncio
+
+# Import resource module only on Unix-like systems (not available on Windows)
+try:
+    import resource
+    HAS_RESOURCE = True
+except ImportError:
+    HAS_RESOURCE = False
 from functools import wraps
 from pathlib import Path
 from typing import List, Tuple, Optional
@@ -71,7 +77,12 @@ def reliability_guard(memory_limit: float = 256):
     """
     Set resource limits for memory usage to prevent system overload
     Currently disabled but can be used to enforce memory limits
+    Only works on Unix-like systems (Linux, macOS)
     """
+    if not HAS_RESOURCE:
+        print("Resource limits not available on this platform (Windows)")
+        return
+        
     hard = resource.getrlimit(resource.RLIMIT_AS)[1]
     memory_limit_bytes = int(memory_limit * 1024 * 1024)  # in bytes
 
@@ -100,6 +111,8 @@ def run_code(
     
     def get_peak_memory_mb():
         """Get peak memory usage in MB"""
+        if not HAS_RESOURCE:
+            return 0.0  # Return 0 on Windows where resource module is not available
         usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         if sys.platform == 'darwin': # darwin is Mac OS X
             return usage / (1024 * 1024)  # Convert bytes -> MB
