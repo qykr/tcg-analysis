@@ -27,7 +27,7 @@ from confusion_matrix_utils import calculate_confusion_matrix_stats
 load_dotenv()
 
 class ReasoningTraceGenerator:
-    def __init__(self, api_key: str, model: str = "openai/gpt-4o-mini", output_file: str = "responses.jsonl"):
+    def __init__(self, api_key: str, model: str = "qwen/qwen3-next-80b-a3b-thinking", output_file: str = "responses.jsonl"):
         self.client = OpenRouterClient(api_key)
         self.model = model
         self.output_file = output_file
@@ -76,8 +76,8 @@ class ReasoningTraceGenerator:
                 full_response = await self.client.async_chat(
                     model=self.model,
                     messages=messages,
-                    max_tokens=4000,
-                    temperature=0.7
+                    max_tokens=16000,
+                    temperature=0.0
                 )
                 
                 # Extract JSON from the end of the response
@@ -175,8 +175,8 @@ class ReasoningTraceGenerator:
                 trace = await self.client.async_chat(
                     model=self.model,
                     messages=messages,
-                    max_tokens=2000,
-                    temperature=0.7
+                    max_tokens=16000,
+                    temperature=0.0
                 )
                 
                 # Extract Python code from the response

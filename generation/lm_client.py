@@ -58,3 +58,6 @@ class OpenRouterClient:
 if __name__ == "__main__":
     client = OpenRouterClient(os.getenv('OPENROUTER_API_KEY'))
     print(client.chat(model="google/gemma-3-27b-it:free", messages=[{"role": "user", "content": "Hello, how are you?"}]))
+    print(client.chat(model="google/gemini-2.5-flash", messages=[{"role": "user", "content": "Hello, how are you?"}]))
+    print(client.chat(model="z-ai/glm-4.5", messages=[{"role": "user", "content": "Hello, how are you?"}]))
+    print(client.chat(model="qwen/qwen3-next-80b-a3b-thinking", messages=[{"role": "user", "content": "Hello, how are you?"}]))
