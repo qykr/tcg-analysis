@@ -31,6 +31,54 @@
     "r-1757645806.6064289": {
       "description": "tuffest reasoning trace in the pacific northwest 😎😎",
       "submittedAt": "2025-09-13T23:05:56.196Z"
+    },
+    "r-1758248458.970846": {
+      "description": "reasoner reasoned like doing binary search. manually conducted binary search to find the outputs",
+      "submittedAt": "2025-09-20T01:23:46.131Z"
+    },
+    "r-1758248512.1176853": {
+      "description": "The reasoner merely reasoned how it was going to solve it. It didn't actually reason through the input for the output, it just gave the solution idea without any calculations in between.",
+      "submittedAt": "2025-09-20T01:41:38.263Z"
+    },
+    "r-1758249052.4391506": {
+      "description": "Good reasoning. Per query, LLM gave good analysis on how it got the answer.",
+      "submittedAt": "2025-09-20T01:43:36.540Z"
+    },
+    "r-1758249056.003614": {
+      "description": "Very good reasoning trace. LLM reasoned through how to get each answer.",
+      "submittedAt": "2025-09-20T01:47:10.478Z"
+    },
+    "r-1758249067.840374": {
+      "description": "Very good reasoning trace. Answered with good explanations per query",
+      "submittedAt": "2025-09-20T01:47:46.559Z"
+    },
+    "r-1758249077.5197132": {
+      "description": "Seems to be the same problem as one of the earlier ones?",
+      "submittedAt": "2025-09-20T01:48:28.112Z"
+    },
+    "r-1758249069.9847069": {
+      "description": "Answered in latex. Perfect reasoning trace, with ample chain-of-thought.",
+      "submittedAt": "2025-09-20T01:49:51.309Z"
+    },
+    "r-1758249102.4517126": {
+      "description": "Extremely good reasoning trace. Very clear steps of operation.",
+      "submittedAt": "2025-09-20T01:51:43.752Z"
+    },
+    "r-1758249138.88271": {
+      "description": "A lot of computation.  Good reasoning trace.",
+      "submittedAt": "2025-09-20T01:52:10.371Z"
+    },
+    "r-1758249206.158868": {
+      "description": "\"The JSON output is specified as required by the problem instructions, regardless of the actual test cases.\"\nPerhaps the output was already specified somewhere?",
+      "submittedAt": "2025-09-20T01:55:08.884Z"
+    },
+    "r-1758249232.7395499": {
+      "description": "Very good reasoning trace. ample amounts of calculations",
+      "submittedAt": "2025-09-20T01:57:16.790Z"
+    },
+    "r-1758249270.4939673": {
+      "description": "\"Thus, the JSON output contains these values in order.\"\nNot sure, but is the output already provided?",
+      "submittedAt": "2025-09-20T01:57:47.712Z"
     }
   }
 }
